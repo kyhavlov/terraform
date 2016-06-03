@@ -13,12 +13,26 @@ Downloads and exports the ID of a Docker image. This can be used alongside
 to programmatically get the latest image IDs without having to hardcode
 them.
 
-## Example Usage
+# Example Usage
 
+### Static image tag
 ```
-# Find the latest Ubuntu precise image.
 resource "docker_image" "ubuntu" {
     name = "ubuntu:precise"
+}
+
+# Access it somewhere else with ${docker_image.ubuntu.latest}
+```
+
+### Dynamic image tag
+```
+data "docker_image" "ubuntu" {
+    name = "ubuntu:precise"
+}
+
+resource "docker_image" "ubuntu" {
+    name = "${data.docker_image.ubuntu.name}"
+    registry_id = "${data.docker_image.ubuntu.id}"
 }
 
 # Access it somewhere else with ${docker_image.ubuntu.latest}
@@ -36,6 +50,10 @@ The following arguments are supported:
 * `keep_locally` - (Optional, boolean) If true, then the Docker image won't be
   deleted on destroy operation. If this is false, it will delete the image from
   the docker local storage on destroy operation.
+* `registry_id` - (Optional, string) Used to store the image ID from the registry
+  and will cause a recreate when changed. Needed when using the docker image
+  [data source](/docs/providers/docker/d/image.html) to trigger an update of the 
+  image.
 
 ## Attributes Reference
 

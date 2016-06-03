@@ -17,6 +17,12 @@ func resourceDockerImage() *schema.Resource {
 				Required: true,
 			},
 
+			"registry_id": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+			},
+
 			"keep_updated": &schema.Schema{
 				Type:     schema.TypeBool,
 				Optional: true,

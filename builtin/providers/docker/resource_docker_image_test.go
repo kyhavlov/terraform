@@ -73,6 +73,22 @@ func TestAccDockerImage_destroy(t *testing.T) {
 	})
 }
 
+func TestAccDockerImage_data(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                  func() { testAccPreCheck(t) },
+		Providers:                 testAccProviders,
+		PreventPostDestroyRefresh: true,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccDockerImageFromDataConfig,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestMatchResourceAttr("docker_image.foobarbaz", "latest", contentDigestRegexp),
+				),
+			},
+		},
+	})
+}
+
 func testAccDockerImageDestroy(s *terraform.State) error {
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "docker_image" {
@@ -108,5 +124,16 @@ const testAccDockerImageKeepLocallyConfig = `
 resource "docker_image" "foobarzoo" {
 	name = "crux:3.1"
 	keep_locally = true
+}
+`
+
+const testAccDockerImageFromDataConfig = `
+data "docker_image" "foobarbaz" {
+	name = "alpine:latest"
+}
+
+resource "docker_image" "foobarbaz" {
+	name = "${data.docker_image.foobarbaz.name}"
+	registry_id = "${data.docker_image.foobarbaz.id}"
 }
 `

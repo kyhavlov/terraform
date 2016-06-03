@@ -2,6 +2,7 @@ package docker
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	dc "github.com/fsouza/go-dockerclient"
@@ -10,7 +11,7 @@ import (
 
 func resourceDockerImageCreate(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*dc.Client)
-	apiImage, err := findImage(d, client)
+	apiImage, err := findImage(d, client, true)
 	if err != nil {
 		return fmt.Errorf("Unable to read Docker image into resource: %s", err)
 	}
@@ -23,7 +24,7 @@ func resourceDockerImageCreate(d *schema.ResourceData, meta interface{}) error {
 
 func resourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*dc.Client)
-	apiImage, err := findImage(d, client)
+	apiImage, err := findImage(d, client, false)
 	if err != nil {
 		return fmt.Errorf("Unable to read Docker image into resource: %s", err)
 	}
@@ -36,8 +37,15 @@ func resourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
 func resourceDockerImageUpdate(d *schema.ResourceData, meta interface{}) error {
 	// We need to re-read in case switching parameters affects
 	// the value of "latest" or others
+	client := meta.(*dc.Client)
+	apiImage, err := findImage(d, client, true)
+	if err != nil {
+		return fmt.Errorf("Unable to read Docker image into resource: %s", err)
+	}
 
-	return resourceDockerImageRead(d, meta)
+	d.Set("latest", apiImage.ID)
+
+	return nil
 }
 
 func resourceDockerImageDelete(d *schema.ResourceData, meta interface{}) error {
@@ -117,6 +125,16 @@ func pullImage(data *Data, client *dc.Client, image string) error {
 	// TODO: Test local registry handling. It should be working
 	// based on the code that was ported over
 
+	pullOpts := parseImageOptions(image)
+
+	if err := client.PullImage(pullOpts, getAuthConfig(pullOpts)); err != nil {
+		return fmt.Errorf("Error pulling image %s: %s\n", image, err)
+	}
+
+	return fetchLocalImages(data, client)
+}
+
+func parseImageOptions(image string) dc.PullImageOptions {
 	pullOpts := dc.PullImageOptions{}
 
 	splitImageName := strings.Split(image, ":")
@@ -151,11 +169,21 @@ func pullImage(data *Data, client *dc.Client, image string) error {
 		pullOpts.Repository = image
 	}
 
-	if err := client.PullImage(pullOpts, dc.AuthConfiguration{}); err != nil {
-		return fmt.Errorf("Error pulling image %s: %s\n", image, err)
+	return pullOpts
+}
+
+func getAuthConfig(pullOpts dc.PullImageOptions) dc.AuthConfiguration {
+	log.Printf("[DEBUG] Registry: %s", pullOpts.Registry)
+	auth := dc.AuthConfiguration{}
+
+	if pullOpts.Registry != "" {
+		auths, _ := dc.NewAuthConfigurationsFromDockerCfg()
+		if auths != nil {
+			auth = auths.Configs["https://"+pullOpts.Registry]
+		}
 	}
 
-	return fetchLocalImages(data, client)
+	return auth
 }
 
 func getImageTag(image string) string {
@@ -179,7 +207,7 @@ func getImageTag(image string) string {
 	return ""
 }
 
-func findImage(d *schema.ResourceData, client *dc.Client) (*dc.APIImages, error) {
+func findImage(d *schema.ResourceData, client *dc.Client, doPull bool) (*dc.APIImages, error) {
 	var data Data
 	if err := fetchLocalImages(&data, client); err != nil {
 		return nil, err
@@ -193,8 +221,10 @@ func findImage(d *schema.ResourceData, client *dc.Client) (*dc.APIImages, error)
 	foundImage := searchLocalImages(data, imageName)
 
 	if d.Get("keep_updated").(bool) || foundImage == nil {
-		if err := pullImage(&data, client, imageName); err != nil {
-			return nil, fmt.Errorf("Unable to pull image %s: %s", imageName, err)
+		if doPull {
+			if err := pullImage(&data, client, imageName); err != nil {
+				return nil, fmt.Errorf("Unable to pull image %s: %s", imageName, err)
+			}
 		}
 	}
 
