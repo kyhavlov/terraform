@@ -238,6 +238,12 @@
 			"revision": "0290933f5e8afd933f2823fce32bf2847e6ea603"
 		},
 		{
+			"checksumSHA1": "vwpCebe1/Uw4IVvhoCEzrsBoA+E=",
+			"path": "github.com/Sirupsen/logrus",
+			"revision": "418b41d23a1bf978c06faea5313ba194650ac088",
+			"revisionTime": "2015-09-08T20:46:18Z"
+		},
+		{
 			"path": "github.com/Unknwon/com",
 			"revision": "28b053d5a2923b87ce8c5a08f3af779894a72758"
 		},
@@ -780,6 +786,30 @@
 			"revisionTime": "2016-06-27T19:55:12Z"
 		},
 		{
+			"checksumSHA1": "jANugvydBy/5m7aEuCER/c6HSJc=",
+			"path": "github.com/docker/distribution/digest",
+			"revision": "9ca7921603852314b18a6ecc19f91806935f34bd",
+			"revisionTime": "2015-08-11T22:53:13Z"
+		},
+		{
+			"checksumSHA1": "/VleR/KJIJU8+4A0dxlmnXLyqds=",
+			"path": "github.com/docker/distribution/manifest",
+			"revision": "9ca7921603852314b18a6ecc19f91806935f34bd",
+			"revisionTime": "2015-08-11T22:53:13Z"
+		},
+		{
+			"checksumSHA1": "YIiCpUu1yt9lBPxB6OaaUtQVs68=",
+			"path": "github.com/docker/docker/pkg/tarsum",
+			"revision": "59311faaed4e3384fc8da738a57a25f17ae07e05",
+			"revisionTime": "2015-09-15T14:55:51Z"
+		},
+		{
+			"checksumSHA1": "R/AFcZejgkici3WnvfaZ+2IIPQE=",
+			"path": "github.com/docker/libtrust",
+			"revision": "9cbd2a1374f46905c68a4eb3694a130610adc62a",
+			"revisionTime": "2015-05-26T20:39:08Z"
+		},
+		{
 			"path": "github.com/dylanmei/iso8601",
 			"revision": "2075bf119b58e5576c6ed9f867b8f3d17f2e54d4"
 		},
@@ -1067,6 +1097,12 @@
 		{
 			"path": "github.com/henrikhodne/go-librato/librato",
 			"revision": "613abdebf4922c4d9d46bcb4bcf14ee18c08d7de"
+		},
+		{
+			"checksumSHA1": "QwXLCuBQtn49K1Pa+gLFmbjfUOw=",
+			"path": "github.com/heroku/docker-registry-client/registry",
+			"revision": "ddbd05bac47f55e533a7ed124211ef7e076b0bf3",
+			"revisionTime": "2015-11-11T18:48:37Z"
 		},
 		{
 			"comment": "v0.0.2-37-g5cd82f0",
