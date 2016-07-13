@@ -17,17 +17,6 @@ func resourceDockerImage() *schema.Resource {
 				Required: true,
 			},
 
-			"registry_id": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: true,
-			},
-
-			"keep_updated": &schema.Schema{
-				Type:     schema.TypeBool,
-				Optional: true,
-			},
-
 			"latest": &schema.Schema{
 				Type:     schema.TypeString,
 				Computed: true,
@@ -36,6 +25,14 @@ func resourceDockerImage() *schema.Resource {
 			"keep_locally": &schema.Schema{
 				Type:     schema.TypeBool,
 				Optional: true,
+			},
+
+			"trigger_pull": &schema.Schema{
+				Type:     schema.TypeSet,
+				Optional: true,
+				ForceNew: true,
+				Elem:     &schema.Schema{Type: schema.TypeString},
+				Set:      schema.HashString,
 			},
 		},
 	}

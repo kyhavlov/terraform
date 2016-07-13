@@ -6,12 +6,11 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/heroku/docker-registry-client/registry"
 )
 
-func dataSourceDockerImage() *schema.Resource {
+func dataSourceDockerRegistryImage() *schema.Resource {
 	return &schema.Resource{
-		Read: dataSourceDockerImageRead,
+		Read: dataSourceDockerRegistryImageRead,
 
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
@@ -19,7 +18,7 @@ func dataSourceDockerImage() *schema.Resource {
 				Optional: true,
 			},
 
-			"id": &schema.Schema{
+			"sha256_digest": &schema.Schema{
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -27,18 +26,19 @@ func dataSourceDockerImage() *schema.Resource {
 	}
 }
 
-func dataSourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
+func dataSourceDockerRegistryImageRead(d *schema.ResourceData, meta interface{}) error {
+	providerConfig := meta.(*ProviderConfig)
 	pullOpts := parseImageOptions(d.Get("name").(string))
-	auth := getAuthConfig(pullOpts)
 
 	// Use the official Docker Hub if a registry isn't specified
 	if pullOpts.Registry == "" {
 		pullOpts.Registry = "registry.hub.docker.com"
 	} else {
+		// Otherwise, filter the registry name out of the repo name
 		pullOpts.Repository = strings.Replace(pullOpts.Repository, pullOpts.Registry+"/", "", 1)
 	}
 
-	// The docker registry prefixes 'library' to official images in the path; 'consul' becomes 'library/consul'
+	// Docker prefixes 'library' to official images in the path; 'consul' becomes 'library/consul'
 	if !strings.Contains(pullOpts.Repository, "/") {
 		pullOpts.Repository = "library/" + pullOpts.Repository
 	}
@@ -47,16 +47,13 @@ func dataSourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
 		pullOpts.Tag = "latest"
 	}
 
-	url := "https://" + pullOpts.Registry
-	username := auth.Username
-	password := auth.Password
-	hub, err := registry.New(url, username, password)
+	registryClient, err := providerConfig.getRegistryClient(pullOpts)
 
 	if err != nil {
-		return fmt.Errorf("Error connecting to registry: %v", err)
+		return fmt.Errorf("Error getting registry client: %v", err)
 	}
 
-	manifest, err := hub.Manifest(pullOpts.Repository, pullOpts.Tag)
+	manifest, err := registryClient.Manifest(pullOpts.Repository, pullOpts.Tag)
 	if err != nil {
 		return fmt.Errorf("Error getting manifest for image: %v", err)
 	}
@@ -72,7 +69,7 @@ func dataSourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	d.SetId(m["id"].(string))
-	d.Set("id", m["id"].(string))
+	d.Set("sha256_digest", "sha256:"+m["id"].(string))
 
 	return nil
 }

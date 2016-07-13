@@ -2,7 +2,6 @@ package docker
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	dc "github.com/fsouza/go-dockerclient"
@@ -10,8 +9,9 @@ import (
 )
 
 func resourceDockerImageCreate(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*dc.Client)
-	apiImage, err := findImage(d, client, true)
+	client := meta.(*ProviderConfig).DockerClient
+	auth := meta.(*ProviderConfig).AuthConfigs
+	apiImage, err := findImage(d, client, auth)
 	if err != nil {
 		return fmt.Errorf("Unable to read Docker image into resource: %s", err)
 	}
@@ -23,13 +23,18 @@ func resourceDockerImageCreate(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*dc.Client)
-	apiImage, err := findImage(d, client, false)
-	if err != nil {
-		return fmt.Errorf("Unable to read Docker image into resource: %s", err)
+	client := meta.(*ProviderConfig).DockerClient
+	var data Data
+	if err := fetchLocalImages(&data, client); err != nil {
+		return fmt.Errorf("Error reading docker image list: %s", err)
 	}
+	foundImage := searchLocalImages(data, d.Get("name").(string))
 
-	d.Set("latest", apiImage.ID)
+	if foundImage != nil {
+		d.Set("latest", foundImage.ID)
+	} else {
+		d.SetId("")
+	}
 
 	return nil
 }
@@ -37,8 +42,9 @@ func resourceDockerImageRead(d *schema.ResourceData, meta interface{}) error {
 func resourceDockerImageUpdate(d *schema.ResourceData, meta interface{}) error {
 	// We need to re-read in case switching parameters affects
 	// the value of "latest" or others
-	client := meta.(*dc.Client)
-	apiImage, err := findImage(d, client, true)
+	client := meta.(*ProviderConfig).DockerClient
+	auth := meta.(*ProviderConfig).AuthConfigs
+	apiImage, err := findImage(d, client, auth)
 	if err != nil {
 		return fmt.Errorf("Unable to read Docker image into resource: %s", err)
 	}
@@ -49,7 +55,7 @@ func resourceDockerImageUpdate(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceDockerImageDelete(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*dc.Client)
+	client := meta.(*ProviderConfig).DockerClient
 	err := removeImage(d, client)
 	if err != nil {
 		return fmt.Errorf("Unable to remove Docker image: %s", err)
@@ -121,13 +127,26 @@ func fetchLocalImages(data *Data, client *dc.Client) error {
 	return nil
 }
 
-func pullImage(data *Data, client *dc.Client, image string) error {
+func pullImage(data *Data, client *dc.Client, authConfig *dc.AuthConfigurations, image string) error {
 	// TODO: Test local registry handling. It should be working
 	// based on the code that was ported over
 
 	pullOpts := parseImageOptions(image)
 
-	if err := client.PullImage(pullOpts, getAuthConfig(pullOpts)); err != nil {
+	// If a registry was specified in the image name, try to find auth for it
+	auth := dc.AuthConfiguration{}
+	if pullOpts.Registry != "" {
+		if authConfig, ok := authConfig.Configs[normalizeRegistryAddress(pullOpts.Registry)]; ok {
+			auth = authConfig
+		}
+	} else {
+		// Try to find an auth config for the public docker hub if a registry wasn't given
+		if authConfig, ok := authConfig.Configs["https://registry.hub.docker.com"]; ok {
+			auth = authConfig
+		}
+	}
+
+	if err := client.PullImage(pullOpts, auth); err != nil {
 		return fmt.Errorf("Error pulling image %s: %s\n", image, err)
 	}
 
@@ -172,42 +191,7 @@ func parseImageOptions(image string) dc.PullImageOptions {
 	return pullOpts
 }
 
-func getAuthConfig(pullOpts dc.PullImageOptions) dc.AuthConfiguration {
-	log.Printf("[DEBUG] Registry: %s", pullOpts.Registry)
-	auth := dc.AuthConfiguration{}
-
-	if pullOpts.Registry != "" {
-		auths, _ := dc.NewAuthConfigurationsFromDockerCfg()
-		if auths != nil {
-			auth = auths.Configs["https://"+pullOpts.Registry]
-		}
-	}
-
-	return auth
-}
-
-func getImageTag(image string) string {
-	splitImageName := strings.Split(image, ":")
-	switch {
-
-	// It's in registry:port/repo:tag format
-	case len(splitImageName) == 3:
-		return splitImageName[2]
-
-	// It's either registry:port/repo or repo:tag with default registry
-	case len(splitImageName) == 2:
-		splitPortRepo := strings.Split(splitImageName[1], "/")
-		if len(splitPortRepo) == 2 {
-			return ""
-		} else {
-			return splitImageName[1]
-		}
-	}
-
-	return ""
-}
-
-func findImage(d *schema.ResourceData, client *dc.Client, doPull bool) (*dc.APIImages, error) {
+func findImage(d *schema.ResourceData, client *dc.Client, authConfig *dc.AuthConfigurations) (*dc.APIImages, error) {
 	var data Data
 	if err := fetchLocalImages(&data, client); err != nil {
 		return nil, err
@@ -220,11 +204,9 @@ func findImage(d *schema.ResourceData, client *dc.Client, doPull bool) (*dc.APII
 
 	foundImage := searchLocalImages(data, imageName)
 
-	if d.Get("keep_updated").(bool) || foundImage == nil {
-		if doPull {
-			if err := pullImage(&data, client, imageName); err != nil {
-				return nil, fmt.Errorf("Unable to pull image %s: %s", imageName, err)
-			}
+	if foundImage == nil {
+		if err := pullImage(&data, client, authConfig, imageName); err != nil {
+			return nil, fmt.Errorf("Unable to pull image %s: %s", imageName, err)
 		}
 	}
 

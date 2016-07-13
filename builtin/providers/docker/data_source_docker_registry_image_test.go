@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform/helper/resource"
 )
 
-var registryIdRegexp = regexp.MustCompile(`\A([a-zA-Z0-9_-]){64}\z`)
+var registryDigestRegexp = regexp.MustCompile(`\A[A-Za-z0-9_\+\.-]+:[A-Fa-f0-9]+\z`)
 
 func TestAccDockerImageDataSource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
@@ -17,7 +17,7 @@ func TestAccDockerImageDataSource_basic(t *testing.T) {
 			resource.TestStep{
 				Config: testAccDockerImageDataSourceConfig,
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestMatchResourceAttr("data.docker_image.foo", "id", registryIdRegexp),
+					resource.TestMatchResourceAttr("data.docker_registry_image.foo", "sha256_digest", registryDigestRegexp),
 				),
 			},
 		},
@@ -25,7 +25,7 @@ func TestAccDockerImageDataSource_basic(t *testing.T) {
 }
 
 const testAccDockerImageDataSourceConfig = `
-data "docker_image" "foo" {
+data "docker_registry_image" "foo" {
 	name = "alpine:latest"
 }
 `

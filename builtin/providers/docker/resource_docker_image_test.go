@@ -54,7 +54,7 @@ func TestAccDockerImage_destroy(t *testing.T) {
 					continue
 				}
 
-				client := testAccProvider.Meta().(*dc.Client)
+				client := testAccProvider.Meta().(*ProviderConfig).DockerClient
 				_, err := client.InspectImage(rs.Primary.Attributes["latest"])
 				if err != nil {
 					return err
@@ -95,7 +95,7 @@ func testAccDockerImageDestroy(s *terraform.State) error {
 			continue
 		}
 
-		client := testAccProvider.Meta().(*dc.Client)
+		client := testAccProvider.Meta().(*ProviderConfig).DockerClient
 		_, err := client.InspectImage(rs.Primary.Attributes["latest"])
 		if err == nil {
 			return fmt.Errorf("Image still exists")
@@ -109,14 +109,12 @@ func testAccDockerImageDestroy(s *terraform.State) error {
 const testAccDockerImageConfig = `
 resource "docker_image" "foo" {
 	name = "alpine:3.1"
-	keep_updated = false
 }
 `
 
 const testAddDockerPrivateImageConfig = `
 resource "docker_image" "foobar" {
 	name = "gcr.io:443/google_containers/pause:0.8.0"
-	keep_updated = true
 }
 `
 
@@ -128,12 +126,12 @@ resource "docker_image" "foobarzoo" {
 `
 
 const testAccDockerImageFromDataConfig = `
-data "docker_image" "foobarbaz" {
+data "docker_registry_image" "foobarbaz" {
 	name = "alpine:latest"
 }
 
 resource "docker_image" "foobarbaz" {
-	name = "${data.docker_image.foobarbaz.name}"
-	registry_id = "${data.docker_image.foobarbaz.id}"
+	name = "${data.docker_registry_image.foobarbaz.name}"
+	trigger_pull = ["${data.docker_registry_image.foobarbaz.sha256_digest}"]
 }
 `
